@@ -1,0 +1,25 @@
+---
+# defaults file for nordvpn
+
+auto_connect: false
+auto_connect_host: ""
+cyber_sec: false
+dns: "disabled"
+firewall: false
+ipv6: false
+kill_switch: false
+# nordvpn set notify. Renamed as notify is a reserved word in Ansible
+notifications: false
+technology: "OPENVPN"
+# Only applicable for OpenVPN
+protocol: "UDP"
+whitelisted_ports: [22]
+whitelisted_subnets: []
+
+# if login is true, you're supposed to set the username and the password. Otherwise, the login will fail
+login: true
+username: "foo"
+password: "bar"
+
+connect: true
+server: ""
