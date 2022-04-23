@@ -135,6 +135,6 @@
   become: true
 
 - name: Connect if it was connected or it needs to connect
-  ansible.builtin.command: /usr/bin/nordvpn connect {{ server }}
-  when: (nordvpn_info2["settings"] != nordvpn_info["settings"] and nordvpn_info["status"]["status"] == "Connected") or (connect == True and nordvpn_info["status"]["status"] != "Connected")
+  ansible.builtin.command: /usr/bin/nordvpn connect {{ server.split(".")[0] }}
+  when: ((nordvpn_info2["settings"] != nordvpn_info["settings"] or (server != "" and server.split(".")[0] != nordvpn_info["status"]["current_server"].split(".")[0])) and nordvpn_info["status"]["status"] == "Connected") or (connect == True and nordvpn_info["status"]["status"] != "Connected")
   become: true
