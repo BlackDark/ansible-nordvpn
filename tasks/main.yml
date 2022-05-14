@@ -40,6 +40,23 @@
     state: latest
   become: true
 
+- name: Create dir for nordvpnd override
+  ansible.builtin.file:
+    path: /etc/systemd/system/nordvpnd.service.d/
+    state: directory
+  become: true
+
+- name: Make an override for nordvpnd
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/nordvpnd.service.d/override.conf
+    content: |
+      [Unit]
+      After=network-online.target
+      Wants=network-online.target
+  notify:
+    - Reload systemd
+  become: true
+
 - name: Collect NordVPN info
   nordvpn_info:
   register: nordvpn_info

@@ -1,2 +1,5 @@
 ---
 # handlers file for nordvpn
+
+- name: Reload systemd
+  command: systemctl daemon-reload
