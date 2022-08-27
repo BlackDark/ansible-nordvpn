@@ -24,7 +24,7 @@
   ansible.builtin.apt_key:
     url: "{{ baseurl }}/gpg/nordvpn_public.asc"
     state: present
-  when: ansible_facts.distribution == "Ubuntu"
+  when: ansible_facts.distribution == "Ubuntu" and false
   become: true
 
 - name: Add specified repository into sources list
@@ -61,7 +61,8 @@
   nordvpn_info:
   register: nordvpn_info
   become: true
-
+- ansible.builtin.debug:
+    var: nordvpn_info
 - name: Login
   ansible.builtin.command: /usr/bin/nordvpn login --username {{ username }} --password {{ password }}
   when: login == true and nordvpn_info["account"]["email"] != username
@@ -69,7 +70,7 @@
 
 - name: Set autoconnect
   ansible.builtin.command: /usr/bin/nordvpn set autoconnect {{ auto_connect }}
-  when: auto_connect != nordvpn_info["settings"]["auto_connect"]
+  when: login == true and auto_connect != nordvpn_info["settings"]["auto_connect"]
   become: true
 
 - name: Set autoconnect server
@@ -153,5 +154,5 @@
 
 - name: Connect if it was connected or it needs to connect
   ansible.builtin.command: /usr/bin/nordvpn connect {{ server.split(".")[0] }}
-  when: ((nordvpn_info2["settings"] != nordvpn_info["settings"] or (server != "" and server.split(".")[0] != nordvpn_info["status"]["current_server"].split(".")[0])) and nordvpn_info["status"]["status"] == "Connected") or (connect == True and nordvpn_info["status"]["status"] != "Connected")
+  when: login == true and (((nordvpn_info2["settings"] != nordvpn_info["settings"] or (server != "" and server.split(".")[0] != nordvpn_info["status"]["current_server"].split(".")[0])) and nordvpn_info["status"]["status"] == "Connected") or (connect == True and nordvpn_info["status"]["status"] != "Connected"))
   become: true

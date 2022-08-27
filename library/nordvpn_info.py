@@ -108,6 +108,65 @@ def _parse_output(cmd: str, regexp: str, groups: List[str]) -> Dict[str, Any]:
 
     return ret
 
+def _parse_output_settings(cmd: str, regexp: str, groups: List[str]) -> Dict[str, Any]:
+    ret = {}
+    res = subprocess.run(["/usr/bin/nordvpn", cmd], stdout=subprocess.PIPE)
+    output = res.stdout.decode("utf-8")
+
+    for group in groups:
+        ret[group] = None
+    
+    ret["whitelisted_ports"] = []
+    ret["whitelisted_subnets"] = []
+
+    whitelist_ports_loop = False
+    whitelist_subnet_loop = False
+    whitelisted_ports = []
+    whitelisted_subnets = []
+    
+    for line in output.splitlines():
+        if line.find(":") == -1:
+            if whitelist_ports_loop:
+                split = line.strip().split(" ")
+                whitelisted_ports.append(int(split[0]))
+                continue
+
+            if whitelist_subnet_loop:
+                whitelisted_subnets.append(line.strip())
+                continue
+
+        if len(line.strip()) > 0 and line.find(":") != -1:
+            if whitelist_ports_loop:
+                ret["whitelisted_ports"] = whitelisted_ports
+                whitelist_ports_loop = False
+
+            if whitelist_subnet_loop:
+                ret["whitelisted_subnets"] = whitelisted_subnets
+                whitelist_subnet_loop = False
+
+            split = line.split(":")
+            key = split[0].strip().lower()
+            value = split[1].strip()
+            
+            if key == "auto-connect":
+                key = "auto_connect"
+            elif key == "kill switch":
+                key = "kill_switch"
+            elif key == "threat protection lite":
+                key = "threat_protection_lite"
+            elif key == "whitelisted ports":
+                whitelist_ports_loop = True
+                continue
+            elif key == "whitelisted subnets":
+                whitelist_subnet_loop = True
+                continue
+            ret[key] = value
+
+    if whitelist_subnet_loop:
+        ret["whitelisted_subnets"] = whitelisted_subnets
+        whitelist_subnet_loop = False
+
+    return ret
 
 def run_module():
     # define available arguments/parameters a user can pass to the module
@@ -172,7 +231,7 @@ def run_module():
     )
 
     # Read settings:
-    settings = _parse_output(
+    settings = _parse_output_settings(
         "settings",
         r".*Technology: (?P<technology>.*)\n(Protocol: (?P<protocol>.*)\n)?(Firewall: (?P<firewall>.*)\n)?(Kill Switch: (?P<kill_switch>.*)\n)?(CyberSec: (?P<cyber_sec>.*)\n)?(Obfuscate: (?P<obfuscate>.*)\n)?(Notify: (?P<notify>.*)\n)?(Auto-connect: (?P<auto_connect>.*)\n)?(IPv6: (?P<ipv6>.*)\n)?(DNS: (?P<dns>.*)\n)?(Whitelisted ports:\n(?P<whitelisted_ports>(\s+.+\n?)*))?(Whitelisted subnets:\n(?P<whitelisted_subnets>(\s+.+\n?)*))?",
         [
@@ -194,21 +253,6 @@ def run_module():
             settings[k] = True
         elif v == "disabled" and k != "dns":
             settings[k] = False
-
-    if settings["whitelisted_ports"] is not None:
-        settings["whitelisted_ports"] = [
-            int(x.strip().split(" ")[0])
-            for x in settings["whitelisted_ports"].splitlines()
-        ]
-    else:
-        settings["whitelisted_ports"] = []
-
-    if settings["whitelisted_subnets"] is not None:
-        settings["whitelisted_subnets"] = [
-            x.strip() for x in settings["whitelisted_subnets"].splitlines()
-        ]
-    else:
-        settings["whitelisted_subnets"] = []
 
     result["settings"] = settings
     # in the event of a successful module execution, you will want to
