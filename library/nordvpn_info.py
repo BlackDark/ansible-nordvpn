@@ -151,10 +151,12 @@ def _parse_output_status(cmd: str, regexp: str, groups: List[str]) -> Dict[str, 
             key = split[0].strip().lower()
             value = split[1].strip()
             
-            if key == "email address":
-                key = "email"
-            elif key == "vpn service":
-                key = "service"
+            if key == "current protocol":
+                key = "current_protocol"
+            elif key == "current server":
+                key = "current_server"
+            elif key == "server ip":
+                key = "server_ip"
             ret[key] = value
     return ret
 

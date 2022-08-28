@@ -40,23 +40,6 @@
     state: latest
   become: true
 
-- name: Create dir for nordvpnd override
-  ansible.builtin.file:
-    path: /etc/systemd/system/nordvpnd.service.d/
-    state: directory
-  become: true
-
-- name: Make an override for nordvpnd
-  ansible.builtin.copy:
-    dest: /etc/systemd/system/nordvpnd.service.d/override.conf
-    content: |
-      [Unit]
-      After=network-online.target
-      Wants=network-online.target
-  notify:
-    - Reload systemd
-  become: true
-
 - name: Collect NordVPN info
   nordvpn_info:
   register: nordvpn_info
@@ -67,20 +50,21 @@
     var: nordvpn_info
 
 - set_fact: logged_in="{{ nordvpn_info.account.email != None }}"
+- set_fact: email_changed="{{ username is defined and nordvpn_info['account']['email'] != username }}"
 
 - ansible.builtin.debug:
     var: logged_in
 
 - name: Login
   ansible.builtin.command: /usr/bin/nordvpn login --username {{ username }} --password {{ password }}
-  when: login == true and with_callback == false and nordvpn_info["account"]["email"] != username
+  when: login == true and with_callback == false and email_changed
   become: true
   register: login_username
 
 # TODO conditional check needs testing
 - name: Init Login with callback
   ansible.builtin.command: /usr/bin/nordvpn login
-  when: login == true and with_callback == true and nordvpn_info["account"]["email"] == None
+  when: login == true and with_callback == true and logged_in == false
   become: true
   register: login_callback
 
@@ -112,77 +96,72 @@
     var: logged_in
 
 - name: Set autoconnect
-  ansible.builtin.command: /usr/bin/nordvpn set autoconnect {{ auto_connect }}
-  when: logged_in == true and auto_connect != nordvpn_info["settings"]["auto_connect"]
-  become: true
-
-- name: Set autoconnect server
-  ansible.builtin.command: /usr/bin/nordvpn set autoconnect enabled {{ auto_connect_host }}
-  when: auto_connect_host != ""
+  ansible.builtin.command: /usr/bin/nordvpn set autoconnect {{ auto_connect }} {{'on' if (auto_connect) else 'off'}} {{ auto_connect_host if (auto_connect_host) else ''}}
+  when: logged_in == true and auto_connect is defined and auto_connect != nordvpn_info["settings"]["auto_connect"]
   become: true
 
 - name: Set cyber_sec
   ansible.builtin.command: /usr/bin/nordvpn set cybersec {{ cyber_sec }}
-  when: cyber_sec != nordvpn_info["settings"]["cyber_sec"]
+  when: cyber_sec is defined and cyber_sec != nordvpn_info["settings"]["cyber_sec"]
   become: true
 
 - name: Set dns
   ansible.builtin.command: /usr/bin/nordvpn set dns {{ dns }}
-  when: dns != nordvpn_info["settings"]["dns"]
+  when: dns is defined and dns != nordvpn_info["settings"]["dns"]
   become: true
 
 - name: Set firewall
   ansible.builtin.command: /usr/bin/nordvpn set firewall {{ firewall }}
-  when: firewall != nordvpn_info["settings"]["firewall"]
+  when: firewall is defined and firewall != nordvpn_info["settings"]["firewall"]
   become: true
 
 - name: Set ipv6
   ansible.builtin.command: /usr/bin/nordvpn set ipv6 {{ ipv6 }}
-  when: ipv6 != nordvpn_info["settings"]["ipv6"]
+  when: ipv6 is defined and ipv6 != nordvpn_info["settings"]["ipv6"]
   become: true
 
 - name: Set notify
   ansible.builtin.command: /usr/bin/nordvpn set notify {{ notifications }}
-  when: notifications != nordvpn_info["settings"]["notify"]
+  when: notifications is defined and notifications != nordvpn_info["settings"]["notify"]
   become: true
 
 - name: Set technology
   ansible.builtin.command: /usr/bin/nordvpn set technology {{ technology }}
-  when: technology != nordvpn_info["settings"]["technology"]
+  when: technology is defined and technology != nordvpn_info["settings"]["technology"]
   become: true
 
 - name: Set protocol
   ansible.builtin.command: /usr/bin/nordvpn set protocol {{ protocol }}
-  when: protocol != nordvpn_info["settings"]["protocol"] and technology == "OpenVPN"
+  when: protocol is defined and protocol != nordvpn_info["settings"]["protocol"] and technology == "OpenVPN"
   become: true
 
 - name: Add missing ports to the white list
   ansible.builtin.command: /usr/bin/nordvpn whitelist add port {{ item }}
-  loop: "{{ whitelisted_ports }}"
+  loop: "{{ whitelisted_ports | default([]) }}"
   when: item not in nordvpn_info["settings"]["whitelisted_ports"]
   become: true
 
 - name: Remove unnneeded ports from the white list
   ansible.builtin.command: /usr/bin/nordvpn whitelist remove port {{ item }}
-  loop: '{{ nordvpn_info["settings"]["whitelisted_ports"] }}'
+  loop: '{{ nordvpn_info["settings"]["whitelisted_ports"] | default([]) }}'
   when: item not in whitelisted_ports
   become: true
 
 - name: Add missing subnets to the white list
   ansible.builtin.command: /usr/bin/nordvpn whitelist add subnet {{ item }}
-  loop: "{{ whitelisted_subnets }}"
+  loop: "{{ whitelisted_subnets | default([])}}"
   when: item not in nordvpn_info["settings"]["whitelisted_subnets"]
   become: true
 
 - name: Remove unnneeded subnets from the white list
   ansible.builtin.command: /usr/bin/nordvpn whitelist remove subnet {{ item }}
-  loop: '{{ nordvpn_info["settings"]["whitelisted_subnets"] }}'
+  loop: '{{ nordvpn_info["settings"]["whitelisted_subnets"] | default([]) }}'
   when: item not in whitelisted_subnets
   become: true
 
 - name: Set killswitch
   ansible.builtin.command: /usr/bin/nordvpn set killswitch {{ kill_switch }}
-  when: kill_switch != nordvpn_info["settings"]["kill_switch"]
+  when: kill_switch is defined and kill_switch != nordvpn_info["settings"]["kill_switch"]
   become: true
 
 - name: Collect NordVPN info2
@@ -194,8 +173,36 @@
   ansible.builtin.command: /usr/bin/nordvpn disconnect
   when: nordvpn_info2["settings"] != nordvpn_info["settings"]
   become: true
+  register: disconnected_vpn
 
-- name: Connect if it was connected or it needs to connect
-  ansible.builtin.command: /usr/bin/nordvpn connect {{ server.split(".")[0] }}
-  #when: logged_in == true and (((nordvpn_info2["settings"] != nordvpn_info["settings"] or (server != "" and server.split(".")[0] != nordvpn_info["status"]["current_server"].split(".")[0])) and nordvpn_info["status"]["status"] == "Connected") or (connect == True and nordvpn_info["status"]["status"] != "Connected"))
+- name: Connect with specified server
+  ansible.builtin.command: /usr/bin/nordvpn connect {{ server }}
+  when: logged_in == true and connect is defined and server is defined and (nordvpn_info2["status"]["status"] != "Connected" or server != nordvpn_info2["status"]["current_server"].split(".")[0] or disconnected_vpn is not skipped)
   become: true
+  register: connect_with_server
+
+- name: Connect without server
+  ansible.builtin.command: /usr/bin/nordvpn connect
+  when: logged_in == true and connect is defined and connect_with_server is skipped and (nordvpn_info2["status"]["status"] != "Connected" or disconnected_vpn is not skipped)
+  become: true
+
+- name: Modify resolv.conf
+  become: true
+  ansible.builtin.copy:
+    content: |
+      # https://support.nordvpn.com/Connectivity/Linux/1134945702/Change-your-DNS-servers-on-Linux.htm
+      nameserver 103.86.96.100
+      nameserver 103.86.99.100
+    dest: /etc/resolv.conf
+    backup: true
+  when: modify_resolv_conf == true
+  register: modified_resolv_conf
+
+- name: Ensure resolv.conf is immutable.
+  become: true
+  file:
+    path: /etc/resolv.conf
+    attr: +i
+  register: resolv_file
+  changed_when: "'i' not in resolv_file.diff.before.attributes"
+  when: modified_resolv_conf is not skipped and modify_resolv_conf_chattr == true

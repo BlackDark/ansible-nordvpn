@@ -1,25 +1,28 @@
 ---
 # defaults file for nordvpn
+# auto_connect:
+# auto_connect_host:
+# cyber_sec:
+# dns:
+# firewall:
+# ipv6:
+# kill_switch:
+# # nordvpn set notify. Renamed as notify is a reserved word in Ansible
+# notifications:
+# technology:
+# # Only applicable for OpenVPN
+# protocol:
+# whitelisted_ports: []
+# whitelisted_subnets: []
 
-auto_connect: false
-auto_connect_host: ""
-cyber_sec: false
-dns: "disabled"
-firewall: false
-ipv6: false
-kill_switch: false
-# nordvpn set notify. Renamed as notify is a reserved word in Ansible
-notifications: false
-technology: "OPENVPN"
-# Only applicable for OpenVPN
-protocol: "UDP"
-whitelisted_ports: [22]
-whitelisted_subnets: []
+# # if login is true, you're supposed to set the username and the password. Otherwise, the login will fail
 
-# if login is true, you're supposed to set the username and the password. Otherwise, the login will fail
-login: true
-username: "foo"
-password: "bar"
+# username:
+# password:
+# server:
 
-connect: true
-server: ""
+login: false
+connect: false
+with_callback: false
+modify_resolv_conf: false
+modify_resolv_conf_chattr: false
