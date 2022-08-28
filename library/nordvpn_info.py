@@ -108,6 +108,56 @@ def _parse_output(cmd: str, regexp: str, groups: List[str]) -> Dict[str, Any]:
 
     return ret
 
+def _parse_output_account(cmd: str, regexp: str, groups: List[str]) -> Dict[str, Any]:
+    ret = {}
+    res = subprocess.run(["/usr/bin/nordvpn", cmd], stdout=subprocess.PIPE)
+    output = res.stdout.decode("utf-8")
+
+    for group in groups:
+        ret[group] = None
+    
+    for line in output.splitlines():
+        if len(line.strip()) > 0 and line.find(":") != -1:
+            split = line.split(":")
+            
+            if len(split) != 2:
+                continue
+
+            key = split[0].strip().lower()
+            value = split[1].strip()
+            
+            if key == "email address":
+                key = "email"
+            elif key == "vpn service":
+                key = "service"
+            ret[key] = value
+    return ret
+
+def _parse_output_status(cmd: str, regexp: str, groups: List[str]) -> Dict[str, Any]:
+    ret = {}
+    res = subprocess.run(["/usr/bin/nordvpn", cmd], stdout=subprocess.PIPE)
+    output = res.stdout.decode("utf-8")
+
+    for group in groups:
+        ret[group] = None
+    
+    for line in output.splitlines():
+        if len(line.strip()) > 0 and line.find(":") != -1:
+            split = line.split(":")
+            
+            if len(split) != 2:
+                continue
+
+            key = split[0].strip().lower()
+            value = split[1].strip()
+            
+            if key == "email address":
+                key = "email"
+            elif key == "vpn service":
+                key = "service"
+            ret[key] = value
+    return ret
+
 def _parse_output_settings(cmd: str, regexp: str, groups: List[str]) -> Dict[str, Any]:
     ret = {}
     res = subprocess.run(["/usr/bin/nordvpn", cmd], stdout=subprocess.PIPE)
@@ -202,7 +252,7 @@ def run_module():
     # Read account info
     try:
         result["account"].update(
-            _parse_output(
+            _parse_output_account(
                 "account",
                 r".*Account Information:\n(Email Address: (?P<email>.*)\n)?(VPN Service: (?P<service>.*))?",
                 ["email", "service"],
@@ -213,7 +263,7 @@ def run_module():
 
     # Read status
     result["status"].update(
-        _parse_output(
+        _parse_output_status(
             "status",
             r".*Status: (?P<status>.*)\n(Current server: (?P<current_server>.*)\n)?(Country:(?P<country>.*)\n)?(City: (?P<city>.*)\n)?(Server IP: (?P<server_ip>.*)\n)?(Current technology: (?P<current_technology>.*)\n)?(Current protocol: (?P<current_protocol>.*)\n)?(Transfer: (?P<transfer>.*)\n)?(Uptime: (?P<uptime>.*))?",
             [

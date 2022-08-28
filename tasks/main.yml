@@ -24,7 +24,7 @@
   ansible.builtin.apt_key:
     url: "{{ baseurl }}/gpg/nordvpn_public.asc"
     state: present
-  when: ansible_facts.distribution == "Ubuntu" and false
+  when: ansible_facts.distribution == "Ubuntu"
   become: true
 
 - name: Add specified repository into sources list
@@ -61,16 +61,59 @@
   nordvpn_info:
   register: nordvpn_info
   become: true
+
+# TODO remove
 - ansible.builtin.debug:
     var: nordvpn_info
+
+- set_fact: logged_in="{{ nordvpn_info.account.email != None }}"
+
+- ansible.builtin.debug:
+    var: logged_in
+
 - name: Login
   ansible.builtin.command: /usr/bin/nordvpn login --username {{ username }} --password {{ password }}
-  when: login == true and nordvpn_info["account"]["email"] != username
+  when: login == true and with_callback == false and nordvpn_info["account"]["email"] != username
   become: true
+  register: login_username
+
+# TODO conditional check needs testing
+- name: Init Login with callback
+  ansible.builtin.command: /usr/bin/nordvpn login
+  when: login == true and with_callback == true and nordvpn_info["account"]["email"] == None
+  become: true
+  register: login_callback
+
+# TODO remove
+- ansible.builtin.debug:
+    var: login_callback
+  when: login_callback is not skipped
+
+- name: Enter callback URL
+  ansible.builtin.pause:
+    prompt: "{{ login_callback.stdout }} \n Paste response callback here"
+    echo: yes
+  when: login_callback is not skipped
+  register: login_callback_value
+
+- ansible.builtin.debug:
+    var: login_callback_value
+  when: login_callback is not skipped
+
+- name: Login with provided callback URL
+  ansible.builtin.command: /usr/bin/nordvpn login --callback "{{ login_callback_value.user_input }}"
+  when: login_callback is not skipped
+  become: true
+
+- set_fact: logged_in="{{ nordvpn_info.account.email != None }}"
+  when: login_username is not skipped or login_callback is not skipped
+
+- ansible.builtin.debug:
+    var: logged_in
 
 - name: Set autoconnect
   ansible.builtin.command: /usr/bin/nordvpn set autoconnect {{ auto_connect }}
-  when: login == true and auto_connect != nordvpn_info["settings"]["auto_connect"]
+  when: logged_in == true and auto_connect != nordvpn_info["settings"]["auto_connect"]
   become: true
 
 - name: Set autoconnect server
@@ -154,5 +197,5 @@
 
 - name: Connect if it was connected or it needs to connect
   ansible.builtin.command: /usr/bin/nordvpn connect {{ server.split(".")[0] }}
-  when: login == true and (((nordvpn_info2["settings"] != nordvpn_info["settings"] or (server != "" and server.split(".")[0] != nordvpn_info["status"]["current_server"].split(".")[0])) and nordvpn_info["status"]["status"] == "Connected") or (connect == True and nordvpn_info["status"]["status"] != "Connected"))
+  #when: logged_in == true and (((nordvpn_info2["settings"] != nordvpn_info["settings"] or (server != "" and server.split(".")[0] != nordvpn_info["status"]["current_server"].split(".")[0])) and nordvpn_info["status"]["status"] == "Connected") or (connect == True and nordvpn_info["status"]["status"] != "Connected"))
   become: true
