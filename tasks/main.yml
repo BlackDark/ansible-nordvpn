@@ -96,7 +96,7 @@
     var: logged_in
 
 - name: Set autoconnect
-  ansible.builtin.command: /usr/bin/nordvpn set autoconnect {{ auto_connect }} {{'on' if (auto_connect) else 'off'}} {{ auto_connect_host if (auto_connect_host) else ''}}
+  ansible.builtin.command: /usr/bin/nordvpn set autoconnect {{'on' if (auto_connect) else 'off'}} {{ auto_connect_host if (auto_connect_host) else ''}}
   when: logged_in == true and auto_connect is defined and auto_connect != nordvpn_info["settings"]["auto_connect"]
   become: true
 
